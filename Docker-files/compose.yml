@@ -1,0 +1,48 @@
+---
+services:
+   vprodb:
+      build:
+         context: ./db
+      image: vineeth2210/vpro-db
+      ports:
+         - "3306:3306"
+      container_name: vprodb
+      environment:
+         - MYSQL_ROOT_PASSWORD=vprodbpass
+      volumes:
+         - vprodbvol:/var/lib/mysql
+   
+   vprocache01:
+      image: memcached
+      ports:
+         - "11211:11211"
+      container_name: vprocache01
+
+   vpromq01:
+      image: rabbitmq
+      ports:
+         - "5672:5672"
+         - "15672:15672"
+      container_name: vpromq01
+      environment:
+        - RABBITMQ_DEFAULT_USER=guest
+        - RABBITMQ_DEFAULT_PASS=guest
+
+   vproapp:
+      build:
+         context: ./app
+      image: vineeth2210/vpro-app
+      ports:
+         - "8080:8080"
+      container_name: vproapp
+
+   vproweb:
+      build:
+         context: ./web
+      image: vineeth2210/vpro-web
+      ports:
+         - "80:80"
+      container_name: vproweb
+
+volumes:
+  vprodbvol: {}
