@@ -1,0 +1,97 @@
+- name: Run MySQL container
+  hosts: mysql
+  become: yes
+
+  tasks:
+    - name: Pull MySQL image
+      docker_image:
+        name: mysql
+        source: pull
+
+    - name: Run MySQL container
+      docker_container:
+        name: mysql
+        image: mysql
+        state: started
+        restart_policy: always
+        env:
+          MYSQL_ROOT_PASSWORD: rootpassword
+        ports:
+          - "3306:3306"
+
+- name: Run Memcached container
+  hosts: memcached
+  become: yes
+
+  tasks:
+    - name: Pull memcached image
+      docker_image:
+        name: memcached
+        source: pull
+
+    - name: Run memcached container
+      docker_container:
+        name: memcached
+        image: memcached
+        state: started
+        restart_policy: always
+        ports:
+          - "11211:11211"
+
+- name: Run RabbitMQ container
+  hosts: rabbitmq
+  become: yes
+
+  tasks:
+    - name: Pull rabbitmq image
+      docker_image:
+        name: rabbitmq:management
+        source: pull
+
+    - name: Run rabbitmq container
+      docker_container:
+        name: rabbitmq
+        image: rabbitmq:management
+        state: started
+        restart_policy: always
+        ports:
+          - "5672:5672"
+          - "15672:15672"
+
+- name: Run Nginx container
+  hosts: nginx
+  become: yes
+
+  tasks:
+    - name: Pull nginx image
+      docker_image:
+        name: nginx
+        source: pull
+
+    - name: Run nginx container
+      docker_container:
+        name: nginx
+        image: nginx
+        state: started
+        restart_policy: always
+        ports:
+          - "80:80"
+
+- name: Run Tomcat container
+  hosts: tomcat
+  become: yes
+
+  tasks:
+    - name: Pull tomcat image
+      docker_image:
+        name: tomcat
+        source: pull
+
+    - name: Run tomcat container
+      docker_container:
+        name: tomcat
+        image: tomcat
+        state: started
+        restart_policy: always
+        ports:
+          - "8080:8080"
