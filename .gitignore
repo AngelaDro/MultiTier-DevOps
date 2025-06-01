@@ -1,8 +1,15 @@
-echo "target/" >> .gitignore
-echo ".terraform/" >> .gitignore
-echo "*.tfstate" >> .gitignore
-echo "*.tfstate.backup" >> .gitignore
+target/
+.terraform/
+*.tfstate
+*.tfstate.backup
+project_MTVML/terraform/.terraform/
+target/vprofile-v2.war/
+.DS_Store
 
+*.log
+*.lock
+.idea/  # Если используете IntelliJ IDEA
+*.iml   # Файлы конфигурации IntelliJ
 
 
 
