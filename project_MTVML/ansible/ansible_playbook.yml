@@ -1,97 +1,141 @@
-- name: Run MySQL container
+---
+- name: Configure MySQL server
   hosts: mysql
-  become: yes
-
+  become: true
   tasks:
-    - name: Pull MySQL image
-      docker_image:
-        name: mysql
-        source: pull
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
 
-    - name: Run MySQL container
-      docker_container:
+    - name: Install MySQL server
+      apt:
+        name: mysql-server
+        state: present
+
+    - name: Ensure MySQL service is running
+      service:
         name: mysql
-        image: mysql
         state: started
-        restart_policy: always
-        env:
-          MYSQL_ROOT_PASSWORD: rootpassword
-        ports:
-          - "3306:3306"
+        enabled: true
 
-- name: Run Memcached container
+    - name: Secure MySQL installation
+      command: mysql_secure_installation
+      args:
+        creates: /root/.my.cnf
+      environment:
+        MYSQL_ROOT_PASSWORD: "{{ lookup('env', 'MYSQL_ROOT_PASSWORD') | default('securepassword', true) }}"
+
+- name: Configure Memcached server
   hosts: memcached
-  become: yes
-
+  become: true
   tasks:
-    - name: Pull memcached image
-      docker_image:
-        name: memcached
-        source: pull
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
 
-    - name: Run memcached container
-      docker_container:
+    - name: Install Memcached
+      apt:
         name: memcached
-        image: memcached
+        state: present
+
+    - name: Ensure Memcached service is running
+      service:
+        name: memcached
         state: started
-        restart_policy: always
-        ports:
-          - "11211:11211"
+        enabled: true
 
-- name: Run RabbitMQ container
+- name: Configure RabbitMQ server
   hosts: rabbitmq
-  become: yes
-
+  become: true
   tasks:
-    - name: Pull rabbitmq image
-      docker_image:
-        name: rabbitmq:management
-        source: pull
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
 
-    - name: Run rabbitmq container
-      docker_container:
-        name: rabbitmq
-        image: rabbitmq:management
+    - name: Add RabbitMQ signing key
+      apt_key:
+        url: https://keys.openpgp.org/vks/v1/by-fingerprint/0A9AF2115F4687BD29803A206B73A36E6026DFCA
+        state: present
+
+    - name: Add RabbitMQ repository
+      apt_repository:
+        repo: deb https://dl.bintray.com/rabbitmq/debian bionic main
+        state: present
+        filename: rabbitmq
+
+    - name: Install RabbitMQ server
+      apt:
+        name: rabbitmq-server
+        state: present
+
+    - name: Ensure RabbitMQ service is running
+      service:
+        name: rabbitmq-server
         state: started
-        restart_policy: always
-        ports:
-          - "5672:5672"
-          - "15672:15672"
+        enabled: true
 
-- name: Run Nginx container
-  hosts: nginx
-  become: yes
+    - name: Enable RabbitMQ management plugin
+      command: rabbitmq-plugins enable rabbitmq_management
+      args:
+        creates: /etc/rabbitmq/enabled_plugins
 
-  tasks:
-    - name: Pull nginx image
-      docker_image:
-        name: nginx
-        source: pull
-
-    - name: Run nginx container
-      docker_container:
-        name: nginx
-        image: nginx
-        state: started
-        restart_policy: always
-        ports:
-          - "80:80"
-
-- name: Run Tomcat container
+- name: Configure Tomcat server
   hosts: tomcat
-  become: yes
-
+  become: true
   tasks:
-    - name: Pull tomcat image
-      docker_image:
-        name: tomcat
-        source: pull
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
 
-    - name: Run tomcat container
-      docker_container:
-        name: tomcat
-        image: tomcat
+    - name: Install OpenJDK
+      apt:
+        name: openjdk-11-jdk
+        state: present
+
+    - name: Install Tomcat
+      apt:
+        name: tomcat9
+        state: present
+
+    - name: Ensure Tomcat service is running
+      service:
+        name: tomcat9
         state: started
-        restart_policy: always
-        ports:
-          - "8080:8080"
+        enabled: true
+
+- name: Configure Nginx server
+  hosts: nginx
+  become: true
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install Nginx
+      apt:
+        name: nginx
+        state: present
+
+    - name: Ensure Nginx service is running
+      service:
+        name: nginx
+        state: started
+        enabled: true
+
+    - name: Configure Nginx to proxy to Tomcat
+      template:
+        src: templates/nginx-tomcat.conf.j2
+        dest: /etc/nginx/sites-available/tomcat
+        mode: '0644'
+      notify: Restart Nginx
+
+  handlers:
+    - name: Restart Nginx
+      service:
+        name: nginx
+        state: restarted

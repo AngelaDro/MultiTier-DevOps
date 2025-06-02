@@ -34,7 +34,7 @@ variable "key_name" {
 
 variable "ami_id" {
   type    = string
-  default = "ami-053b0d53c279acc90"
+  default = "ami-0f9de6e2d2f067fca"
 }
 
 resource "aws_security_group" "main_sg" {
@@ -118,6 +118,7 @@ resource "aws_instance" "mysql" {
   instance_type               = "t2.micro"
   key_name                    = var.key_name
   vpc_security_group_ids      = [aws_security_group.main_sg.id]
+  associate_public_ip_address = true
 
   root_block_device {
     volume_size = 8
@@ -134,6 +135,7 @@ resource "aws_instance" "memcached" {
   instance_type               = "t2.micro"
   key_name                    = var.key_name
   vpc_security_group_ids      = [aws_security_group.main_sg.id]
+  associate_public_ip_address = true
 
   root_block_device {
     volume_size = 8
@@ -150,6 +152,7 @@ resource "aws_instance" "rabbitmq" {
   instance_type               = "t2.micro"
   key_name                    = var.key_name
   vpc_security_group_ids      = [aws_security_group.main_sg.id]
+  associate_public_ip_address = true
 
   root_block_device {
     volume_size = 8
@@ -166,6 +169,7 @@ resource "aws_instance" "tomcat" {
   instance_type               = "t2.micro"
   key_name                    = var.key_name
   vpc_security_group_ids      = [aws_security_group.main_sg.id]
+  associate_public_ip_address = true
 
   root_block_device {
     volume_size = 8
@@ -182,6 +186,7 @@ resource "aws_instance" "nginx" {
   instance_type               = "t2.micro"
   key_name                    = var.key_name
   vpc_security_group_ids      = [aws_security_group.main_sg.id]
+  associate_public_ip_address = true
 
   root_block_device {
     volume_size = 8
@@ -190,5 +195,36 @@ resource "aws_instance" "nginx" {
   
   tags = {
     Name = "nginx"
+  }
+}
+
+resource "local_file" "ansible_hosts" {
+  content = <<-EOT
+    [mysql]
+    ${aws_instance.mysql.public_ip} ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/${var.key_name}.pem
+
+    [memcached]
+    ${aws_instance.memcached.public_ip} ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/${var.key_name}.pem
+
+    [rabbitmq]
+    ${aws_instance.rabbitmq.public_ip} ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/${var.key_name}.pem
+
+    [tomcat]
+    ${aws_instance.tomcat.public_ip} ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/${var.key_name}.pem
+
+    [nginx]
+    ${aws_instance.nginx.public_ip} ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/${var.key_name}.pem
+  EOT
+  filename = "../ansible/hosts"
+}
+
+output "server_public_ips" {
+  description = "Public IP addresses of all EC2 instances"
+  value = {
+    mysql     = aws_instance.mysql.public_ip
+    memcached = aws_instance.memcached.public_ip
+    rabbitmq  = aws_instance.rabbitmq.public_ip
+    tomcat    = aws_instance.tomcat.public_ip
+    nginx     = aws_instance.nginx.public_ip
   }
 }
