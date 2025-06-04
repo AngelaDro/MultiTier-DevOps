@@ -2,11 +2,15 @@
 - name: Configure MySQL server
   hosts: mysql
   become: true
+  vars:
+    ansible_python_interpreter: /usr/bin/python3.10
+    mysql_root_password: "{{ lookup('env', 'MYSQL_ROOT_PASSWORD') | default('securepassword', true) }}"
   tasks:
     - name: Update apt cache
       apt:
         update_cache: yes
         cache_valid_time: 3600
+      timeout: 300
 
     - name: Install MySQL server
       apt:
@@ -17,14 +21,43 @@
       service:
         name: mysql
         state: started
-        enabled: true
+        enabled: yes
 
-    - name: Secure MySQL installation
-      command: mysql_secure_installation
-      args:
-        creates: /root/.my.cnf
-      environment:
-        MYSQL_ROOT_PASSWORD: "{{ lookup('env', 'MYSQL_ROOT_PASSWORD') | default('securepassword', true) }}"
+    - name: Install Python MySQL client
+      apt:
+        name: python3-mysqldb
+        state: present
+
+    - name: Set MySQL root password
+      community.mysql.mysql_user:
+        name: root
+        password: "{{ mysql_root_password }}"
+        host: localhost
+        state: present
+        login_user: root
+        login_password: ""
+      ignore_errors: yes
+
+    - name: Remove anonymous MySQL users
+      community.mysql.mysql_user:
+        name: ""
+        host_all: yes
+        state: absent
+        login_user: root
+        login_password: "{{ mysql_root_password }}"
+
+    - name: Remove MySQL test database
+      community.mysql.mysql_db:
+        name: test
+        state: absent
+        login_user: root
+        login_password: "{{ mysql_root_password }}"
+
+    - name: Create .my.cnf for root
+      template:
+        src: templates/my.cnf.j2
+        dest: /root/.my.cnf
+        mode: '0600'
 
 - name: Configure Memcached server
   hosts: memcached
@@ -46,41 +79,66 @@
         state: started
         enabled: true
 
-- name: Configure RabbitMQ server
+- name: Install Docker and run RabbitMQ container
   hosts: rabbitmq
   become: true
   tasks:
-    - name: Update apt cache
+
+    - name: Install required packages
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - software-properties-common
+          - gnupg
+        state: present
+        update_cache: yes
+      when: ansible_os_family == "Debian"
+
+    - name: Add Docker GPG key
+      shell: curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+      args:
+        creates: /usr/share/keyrings/docker-archive-keyring.gpg
+      when: ansible_os_family == "Debian"
+
+    - name: Add Docker repository
+      apt_repository:
+        repo: "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Update apt cache after adding Docker repo
       apt:
         update_cache: yes
-        cache_valid_time: 3600
+      when: ansible_os_family == "Debian"
 
-    - name: Add RabbitMQ signing key
-      apt_key:
-        url: https://keys.openpgp.org/vks/v1/by-fingerprint/0A9AF2115F4687BD29803A206B73A36E6026DFCA
-        state: present
-
-    - name: Add RabbitMQ repository
-      apt_repository:
-        repo: deb https://dl.bintray.com/rabbitmq/debian bionic main
-        state: present
-        filename: rabbitmq
-
-    - name: Install RabbitMQ server
+    - name: Install Docker CE
       apt:
-        name: rabbitmq-server
+        name: docker-ce
         state: present
+      when: ansible_os_family == "Debian"
 
-    - name: Ensure RabbitMQ service is running
+    - name: Ensure Docker service is running
       service:
-        name: rabbitmq-server
+        name: docker
         state: started
         enabled: true
 
-    - name: Enable RabbitMQ management plugin
-      command: rabbitmq-plugins enable rabbitmq_management
-      args:
-        creates: /etc/rabbitmq/enabled_plugins
+    - name: Pull RabbitMQ image
+      community.docker.docker_image:
+        name: rabbitmq:3-management
+        source: pull
+
+    - name: Run RabbitMQ container
+      community.docker.docker_container:
+        name: rabbitmq
+        image: rabbitmq:3-management
+        ports:
+          - "5672:5672"
+          - "15672:15672"
+        state: started
+        restart_policy: always
 
 - name: Configure Tomcat server
   hosts: tomcat

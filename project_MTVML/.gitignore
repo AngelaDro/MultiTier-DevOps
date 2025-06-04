@@ -11,6 +11,8 @@ target/vprofile-v2.war/
 .idea/  # Если используете IntelliJ IDEA
 *.iml   # Файлы конфигурации IntelliJ
 
+*erlang_solutions.asc
+*collections/
 
 
 

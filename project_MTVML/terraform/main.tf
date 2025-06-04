@@ -115,7 +115,7 @@ ingress {
 
 resource "aws_instance" "mysql" {
   ami                         = var.ami_id
-  instance_type               = "t2.micro"
+  instance_type               = "t3.micro"
   key_name                    = var.key_name
   vpc_security_group_ids      = [aws_security_group.main_sg.id]
   associate_public_ip_address = true
@@ -149,7 +149,7 @@ resource "aws_instance" "memcached" {
 
 resource "aws_instance" "rabbitmq" {
   ami                         = var.ami_id
-  instance_type               = "t2.micro"
+  instance_type               = "t3.micro"
   key_name                    = var.key_name
   vpc_security_group_ids      = [aws_security_group.main_sg.id]
   associate_public_ip_address = true
@@ -166,7 +166,7 @@ resource "aws_instance" "rabbitmq" {
 
 resource "aws_instance" "tomcat" {
   ami                         = var.ami_id
-  instance_type               = "t2.micro"
+  instance_type               = "t3.micro"
   key_name                    = var.key_name
   vpc_security_group_ids      = [aws_security_group.main_sg.id]
   associate_public_ip_address = true

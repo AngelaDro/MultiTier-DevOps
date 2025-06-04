@@ -1,17 +1,48 @@
+# === Common system files ===
+.DS_Store
+Thumbs.db
+
+# === IntelliJ IDEA / JetBrains IDEs ===
+.idea/
+*.iml
+
+# === Logs and temporary files ===
+*.log
+*.lock
+*.tmp
+*.swp
+
+# === Maven / Java build ===
 target/
+*.war
+*.jar
+*.class
+
+# === Terraform ===
 .terraform/
 *.tfstate
 *.tfstate.backup
-project_MTVML/terraform/.terraform/
-target/vprofile-v2.war/
-.DS_Store
+crash.log
 
-*.log
-*.lock
-.idea/  # Если используете IntelliJ IDEA
-*.iml   # Файлы конфигурации IntelliJ
+# === Ansible cache (if used) ===
+*.retry
+*.facts
 
+# === The provisioning folders within VagrantKlicken ===
+vagrant/**/provisioning_output.log
+vagrant/**/output.txt
 
+# === Files and keys that should stay out of the repository ===
+erlang_solutions.asc
+collections/
+*.pem
+*.key
+*.crt
+*.pub
 
+# === Python (if accidentally used in provisioning) ===
+__pycache__/
+*.pyc
 
-
+# === Vagrant machine images (if accidentally saved) ===
+*.box
