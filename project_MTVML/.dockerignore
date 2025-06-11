@@ -1,0 +1,41 @@
+# === General ===
+.git
+.gitignore
+*.md
+README*
+LICENSE
+
+# === IDEs and editors ===
+.idea/
+.vscode/
+*.iml
+
+# === Build output ===
+target/
+*.war
+*.jar
+*.class
+
+# === Logs and temp ===
+*.log
+*.tmp
+*.bak
+*.swp
+
+# === Secrets and keys ===
+*.pem
+*.key
+*.crt
+*.pub
+.env
+.env.*
+
+# === Terraform and Ansible ===
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.retry
+collections/
+
+# === Jenkins ===
+Jenkinsfile*

@@ -1,20 +1,68 @@
+# === Common system files ===
+.DS_Store
+Thumbs.db
+
+# === IDEs and editors ===
+.idea/
+*.iml
+*.vscode/
+*.swp
+
+# === Logs and temporary files ===
+*.log
+*.lock
+*.tmp
+*.bak
+*.retry
+*.facts
+
+# === Java & Maven ===
 target/
+*.war
+*.jar
+*.class
+
+# === Docker ===
+*.tar
+docker-compose.override.yml
+.docker/
+
+# === Jenkins ===
+Jenkinsfile*
+*.jenkinsfile
+jenkins_output.log
+
+# === Terraform ===
 .terraform/
 *.tfstate
 *.tfstate.backup
-project_MTVML/terraform/.terraform/
-target/vprofile-v2.war/
-.DS_Store
+crash.log
+terraform.tfvars
+*.auto.tfvars
 
-*.log
-*.lock
-.idea/  # Если используете IntelliJ IDEA
-*.iml   # Файлы конфигурации IntelliJ
+# === Ansible ===
+*.retry
+*.facts
+collections/
+inventory.yaml
+*.vault
+*.cfg
 
-*erlang_solutions.asc
-*collections/
+# === AWS / sensitive keys ===
+*.pem
+*.key
+*.crt
+*.pub
+aws-credentials.json
+.env
+.env.*
 
+# === Python (if accidentally used) ===
+__pycache__/
+*.pyc
 
-
-
-
+# === Vagrant ===
+*.box
+.vagrant/
+vagrant/**/provisioning_output.log
+vagrant/**/output.txt
