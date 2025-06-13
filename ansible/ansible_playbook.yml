@@ -1,5 +1,6 @@
 ---
 - name: Configure MySQL server
+  gather_facts: true
   hosts: mysql
   become: true
   vars:
@@ -60,6 +61,7 @@
         mode: '0600'
 
 - name: Configure Memcached server
+  gather_facts: true
   hosts: memcached
   become: true
   tasks:
@@ -80,6 +82,7 @@
         enabled: true
 
 - name: Install Docker and run RabbitMQ container
+  gather_facts: true
   hosts: rabbitmq
   become: true
   tasks:
@@ -141,6 +144,7 @@
         restart_policy: always
 
 - name: Configure Tomcat server
+  gather_facts: true
   hosts: tomcat
   become: true
   tasks:
@@ -166,6 +170,7 @@
         enabled: true
 
 - name: Configure Nginx server
+  gather_facts: true
   hosts: nginx
   become: true
   tasks:

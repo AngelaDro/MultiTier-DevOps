@@ -10,7 +10,7 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                git 'https://github.com/devopshydclub/vprofile-project.git'
+                git 'https://github.com/AngelaDro/MultiTier-DevOps.git'
             }
         }
 
@@ -44,11 +44,20 @@ pipeline {
                 }
             }
         }
-    }
 
-    post {
-        success {
-            build job: 'deploy-to-tomcat', parameters: [string(name: 'IMAGE_TAG', value: "${IMAGE_TAG}")]
+        stage('Deploy to Tomcat Server') {
+            steps {
+                sshagent(['tomcat-ssh-key']) {
+                    sh '''
+                        ssh ec2-user@<TOMCAT_SERVER_IP> "
+                            docker pull $ECR_REPO:${BUILD_NUMBER} &&
+                            docker stop tomcat-app || true &&
+                            docker rm tomcat-app || true &&
+                            docker run -d --name tomcat-app -p 8080:8080 $ECR_REPO:${BUILD_NUMBER}
+                        "
+                    '''
+                }
+            }
         }
     }
 }
