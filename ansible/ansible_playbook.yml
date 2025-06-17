@@ -199,7 +199,7 @@
       git:
         repo: https://github.com/AngelaDro/MultiTier-DevOps.git
         dest: /home/ubuntu/MultiTier-DevOps
-        version: main
+        version: vpro-file
         force: yes
 
     - name: Build Tomcat app Docker image
