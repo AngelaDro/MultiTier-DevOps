@@ -183,73 +183,31 @@
         state: present
       when: ansible_os_family == "Debian"
 
-    - name: Ensure Docker service is running
+    - name: Ensure Docker is running
       service:
         name: docker
         state: started
         enabled: true
 
-    - name: Archive app directory on localhost
-      delegate_to: localhost
-      ansible.builtin.archive:
-        path: "/Users/angela/linux_practice/Devops_Projects/project_MTVML/src/main"
-        dest: "/tmp/app.tar.gz"
-        format: gz
-
-    - name: Ensure ubuntu user exists on remote host
-      ansible.builtin.user:
-        name: ubuntu
+    - name: Install git on remote host
+      apt:
+        name: git
         state: present
-        create_home: yes
+        update_cache: yes
 
-    - name: Ensure /home/ubuntu directory exists on remote host
-      ansible.builtin.file:
-        path: /home/ubuntu
-        state: directory
-        mode: '0755'
-        owner: ubuntu
-        group: ubuntu
-
-    - name: Copy archive to remote host
-      ansible.builtin.copy:
-        src: "/tmp/app.tar.gz"
-        dest: "/home/ubuntu/app.tar.gz"
-        mode: '0644'
-
-    - name: Ensure app directory exists on remote host
-      ansible.builtin.file:
-        path: "/home/ubuntu/app/"
-        state: directory
-        mode: '0755'
-        owner: ubuntu
-        group: ubuntu
-
-    - name: Extract app archive on remote host
-      ansible.builtin.unarchive:
-        src: "/home/ubuntu/app.tar.gz"
-        dest: "/home/ubuntu/app/"
-        remote_src: yes
-        owner: ubuntu
-        group: ubuntu
-
-    - name: Copy app.Dockerfile to remote host
-      copy:
-        src: /Users/angela/linux_practice/Devops_Projects/project_MTVML/app.Dockerfile
-        dest: /home/ubuntu/app/app.Dockerfile
-        mode: '0644'
-
-    - name: Copy project to remote host
-      ansible.builtin.copy:
-        src: "{{ playbook_dir }}/.."
-        dest: /home/ubuntu/project_MTVML
-        mode: preserve
+    - name: Clone GitHub repo with app source
+      git:
+        repo: https://github.com/AngelaDro/MultiTier-DevOps.git
+        dest: /home/ubuntu/MultiTier-DevOps
+        version: main
+        force: yes
 
     - name: Build Tomcat app Docker image
       community.docker.docker_image:
         name: custom-tomcat
         source: build
         build:
-          path: "/home/ubuntu/project_MTVML"
+          path: "/home/ubuntu/MultiTier-DevOps"
           dockerfile: "app.Dockerfile"
 
     - name: Run Tomcat container
