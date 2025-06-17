@@ -1,17 +1,18 @@
----
 - name: Configure MySQL server
   gather_facts: true
   hosts: mysql
   become: true
   vars:
     ansible_python_interpreter: /usr/bin/python3.10
-    mysql_root_password: "{{ lookup('env', 'MYSQL_ROOT_PASSWORD') | default('securepassword', true) }}"
+    db_name: multidb
+    db_user: multi
+    db_password: multidev
+    mysql_root_password: ''
+    bind_address: "0.0.0.0"
   tasks:
     - name: Update apt cache
       apt:
         update_cache: yes
-        cache_valid_time: 3600
-      timeout: 300
 
     - name: Install MySQL server
       apt:
@@ -29,36 +30,36 @@
         name: python3-mysqldb
         state: present
 
-    - name: Set MySQL root password
-      community.mysql.mysql_user:
-        name: root
-        password: "{{ mysql_root_password }}"
-        host: localhost
+    - name: Allow remote connections to MySQL
+      lineinfile:
+        path: /etc/mysql/mysql.conf.d/mysqld.cnf
+        regexp: '^bind-address'
+        line: "bind-address = {{ bind_address }}"
+        backup: yes
+      notify: Restart MySQL
+
+    - name: Create database
+      community.mysql.mysql_db:
+        name: "{{ db_name }}"
         state: present
         login_user: root
-        login_password: ""
-      ignore_errors: yes
+        login_password: "{{ mysql_root_password }}"
 
-    - name: Remove anonymous MySQL users
+    - name: Create user with remote access
       community.mysql.mysql_user:
-        name: ""
-        host_all: yes
-        state: absent
+        name: "{{ db_user }}"
+        password: "{{ db_password }}"
+        priv: "{{ db_name }}.*:ALL"
+        host: "%"
+        state: present
         login_user: root
         login_password: "{{ mysql_root_password }}"
 
-    - name: Remove MySQL test database
-      community.mysql.mysql_db:
-        name: test
-        state: absent
-        login_user: root
-        login_password: "{{ mysql_root_password }}"
-
-    - name: Create .my.cnf for root
-      template:
-        src: templates/my.cnf.j2
-        dest: /root/.my.cnf
-        mode: '0600'
+  handlers:
+    - name: Restart MySQL
+      service:
+        name: mysql
+        state: restarted
 
 - name: Configure Memcached server
   gather_facts: true
@@ -86,7 +87,6 @@
   hosts: rabbitmq
   become: true
   tasks:
-
     - name: Install required packages
       apt:
         name:
@@ -143,31 +143,123 @@
         state: started
         restart_policy: always
 
-- name: Configure Tomcat server
+- name: Install Docker and run Tomcat container
   gather_facts: true
   hosts: tomcat
   become: true
   tasks:
-    - name: Update apt cache
+    - name: Install required packages
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - software-properties-common
+          - gnupg
+        state: present
+        update_cache: yes
+      when: ansible_os_family == "Debian"
+
+    - name: Add Docker GPG key
+      shell: curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+      args:
+        creates: /usr/share/keyrings/docker-archive-keyring.gpg
+      when: ansible_os_family == "Debian"
+
+    - name: Add Docker repository
+      apt_repository:
+        repo: "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Update apt cache after adding Docker repo
       apt:
         update_cache: yes
-        cache_valid_time: 3600
+      when: ansible_os_family == "Debian"
 
-    - name: Install OpenJDK
+    - name: Install Docker CE
       apt:
-        name: openjdk-11-jdk
+        name: docker-ce
         state: present
+      when: ansible_os_family == "Debian"
 
-    - name: Install Tomcat
-      apt:
-        name: tomcat9
-        state: present
-
-    - name: Ensure Tomcat service is running
+    - name: Ensure Docker service is running
       service:
-        name: tomcat9
+        name: docker
         state: started
         enabled: true
+
+    - name: Archive app directory on localhost
+      delegate_to: localhost
+      ansible.builtin.archive:
+        path: "/Users/angela/linux_practice/Devops_Projects/project_MTVML/src/main"
+        dest: "/tmp/app.tar.gz"
+        format: gz
+
+    - name: Ensure ubuntu user exists on remote host
+      ansible.builtin.user:
+        name: ubuntu
+        state: present
+        create_home: yes
+
+    - name: Ensure /home/ubuntu directory exists on remote host
+      ansible.builtin.file:
+        path: /home/ubuntu
+        state: directory
+        mode: '0755'
+        owner: ubuntu
+        group: ubuntu
+
+    - name: Copy archive to remote host
+      ansible.builtin.copy:
+        src: "/tmp/app.tar.gz"
+        dest: "/home/ubuntu/app.tar.gz"
+        mode: '0644'
+
+    - name: Ensure app directory exists on remote host
+      ansible.builtin.file:
+        path: "/home/ubuntu/app/"
+        state: directory
+        mode: '0755'
+        owner: ubuntu
+        group: ubuntu
+
+    - name: Extract app archive on remote host
+      ansible.builtin.unarchive:
+        src: "/home/ubuntu/app.tar.gz"
+        dest: "/home/ubuntu/app/"
+        remote_src: yes
+        owner: ubuntu
+        group: ubuntu
+
+    - name: Copy app.Dockerfile to remote host
+      copy:
+        src: /Users/angela/linux_practice/Devops_Projects/project_MTVML/app.Dockerfile
+        dest: /home/ubuntu/app/app.Dockerfile
+        mode: '0644'
+
+    - name: Copy project to remote host
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/.."
+        dest: /home/ubuntu/project_MTVML
+        mode: preserve
+
+    - name: Build Tomcat app Docker image
+      community.docker.docker_image:
+        name: custom-tomcat
+        source: build
+        build:
+          path: "/home/ubuntu/project_MTVML"
+          dockerfile: "app.Dockerfile"
+
+    - name: Run Tomcat container
+      community.docker.docker_container:
+        name: tomcat
+        image: custom-tomcat
+        ports:
+          - "8080:8080"
+        state: started
+        restart_policy: always
 
 - name: Configure Nginx server
   gather_facts: true
