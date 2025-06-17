@@ -198,9 +198,16 @@
     - name: Clone GitHub repo with app source
       git:
         repo: https://github.com/AngelaDro/MultiTier-DevOps.git
-        dest: /home/ubuntu/MultiTier-DevOps
+        dest: /home/{{ ansible_user }}/MultiTier-DevOps
         version: vpro-file
         force: yes
+
+    - name: Fix ownership of the project directory
+      file:
+        path: "/home/{{ ansible_user }}/MultiTier-DevOps"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        recurse: yes
 
     - name: Build Tomcat app Docker image
       community.docker.docker_image:
