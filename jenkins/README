@@ -1,0 +1,86 @@
+1. Project structure
+.
+├── ansible/
+├── app.Dockerfile
+├── jenkins/
+│   ├── jenkins.Dockerfile
+│   ├── plugins.txt
+│   └── jenkins_build_deploy.groovy
+├── pom.xml
+├── src/
+├── target/
+└── terraform/
+
+
+2. Description of jenkins folder contents
+
+-   jenkins.Dockerfile - Dockerfile for building Jenkins image with required plugins and dependencies.
+-   plugins.txt - list of Jenkins plugins that are installed when building the image.
+-   jenkins_build_deploy.groovy - Pipeline script for building, fluffing and deploying the application.
+
+
+3. Run Jenkins in Docker
+
+a. Go to the jenkins/ folder:
+
+    cd jenkins
+
+b. Put together an image of Jenkins:
+
+    docker build -t custom-jenkins -f jenkins.Dockerfile 
+
+c. Start a Jenkins container (example):
+
+    docker run -d -p 8080:8080 -p 50000:50000 --name jenkins custom-jenkins
+
+d. Open it in your browser: http://<docker_host_ip>:8080
+
+
+4. How to use pipeline jenkins_build_deploy.groovy
+
+-   In Jenkins, create a new pipeline job.
+-   Specify the contents of jenkins_build_deploy.groovy as the pipeline script.
+-   Make sure to configure for correct operation:
+-   AWS Credentials (aws-ecr-creds) with ECR permissions.
+-   SSH key (tomcat-ssh-key) to access the Tomcat server.
+
+
+5. Configuring the Jenkins environment
+
+-   The Dockerfile is already prescribed to install the required plugins from plugins.txt.
+-   Make sure that all plugins are specified in plugins.txt, for example:
+blueocean:1.27.19
+workflow-aggregator
+credentials-binding
+docker-workflow
+ansible
+git
+terraform
+aws-credentials
+pipeline-aws
+locale
+dark-theme
+pipeline-stage-view
+docker-plugin
+matrix-auth
+timestamper
+publish-over-ssh
+maven-plugin
+
+
+6. Recommendations for working with Jenkins and Ansible
+-   In the Jenkins pipeline, you can run ansible playbooks to automate deployment.
+-   To do this, you can add a stage with a shell command run, such as:
+
+  stage('Deploy via Ansible') {
+    steps {
+      sh 'ansible-playbook -i inventory/hosts.ini ansible/playbook.yml'
+    }
+  }
+  -   Ensure the Jenkins agent has access to the right keys and inventories.
+
+
+7. Example command for manual build and deploy (if needed)
+
+-    docker build -t custom-jenkins -f jenkins/jenkins.Dockerfile .
+-    docker run -d -p 8080:8080 -p 50000:50000 --name jenkins custom-jenkins

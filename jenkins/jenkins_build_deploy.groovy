@@ -14,23 +14,15 @@ pipeline {
             }
         }
 
-        stage('Build WAR') {
+        stage('Build Docker Image') {
             steps {
                 script {
-                    docker.build("java-builder", "-f Dockerfile.build .")
+                    docker.build("my-java-app:${IMAGE_TAG}", "-f app.Dockerfile .")
                 }
             }
         }
 
-        stage('Build Run Image') {
-            steps {
-                script {
-                    docker.build("my-java-app:${IMAGE_TAG}", "-f Dockerfile.run .")
-                }
-            }
-        }
-
-        stage('Push to ECR') {
+        stage('Push to AWS ECR') {
             steps {
                 withCredentials([usernamePassword(credentialsId: 'aws-ecr-creds', usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY')]) {
                     sh '''
@@ -45,16 +37,12 @@ pipeline {
             }
         }
 
-        stage('Deploy to Tomcat Server') {
+        stage('Deploy with Ansible') {
             steps {
-                sshagent(['tomcat-ssh-key']) {
+                sshagent(['jenkins-ssh-key']) {
                     sh '''
-                        ssh ec2-user@<TOMCAT_SERVER_IP> "
-                            docker pull $ECR_REPO:${BUILD_NUMBER} &&
-                            docker stop tomcat-app || true &&
-                            docker rm tomcat-app || true &&
-                            docker run -d --name tomcat-app -p 8080:8080 $ECR_REPO:${BUILD_NUMBER}
-                        "
+                        ansible-playbook -i inventory.ini ansible/deploy.yml \
+                            --extra-vars "image_tag=${BUILD_NUMBER} ecr_repo=${ECR_REPO}"
                     '''
                 }
             }
