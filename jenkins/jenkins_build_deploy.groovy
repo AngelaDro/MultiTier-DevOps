@@ -1,11 +1,12 @@
 pipeline {
     agent any
 
-    environment {
-        AWS_REGION = 'us-east-1'
-        ECR_REPO = '931130763859.dkr.ecr.us-east-1.amazonaws.com/multi/docker-repo'
-        IMAGE_TAG = "${env.BUILD_NUMBER}"
-    }
+   environment {
+    AWS_REGION = 'us-east-1'
+    AWS_ACCOUNT_ID = credentials('aws-account-id') // если как credential, или просто env var
+    ECR_REPO = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/multi/docker-repo"
+    IMAGE_TAG = "${env.BUILD_NUMBER}"
+}
 
     stages {
         stage('Checkout') {
