@@ -1,17 +1,36 @@
 pipeline {
     agent any
 
-   environment {
-    AWS_REGION = 'us-east-1'
-    AWS_ACCOUNT_ID = credentials('aws-account-id') // если как credential, или просто env var
-    ECR_REPO = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/multi/docker-repo"
-    IMAGE_TAG = "${env.BUILD_NUMBER}"
-}
+    environment {
+        AWS_REGION = 'us-east-1'
+        IMAGE_NAME = 'multi/docker-repo'
+        IMAGE_TAG = "${env.BUILD_NUMBER}"
+    }
 
     stages {
         stage('Checkout') {
             steps {
                 git 'https://github.com/AngelaDro/MultiTier-DevOps.git'
+            }
+        }
+
+        stage('Get AWS Account ID') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'aws-ecr-creds', usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+                    script {
+                        def accountId = sh(
+                            script: '''
+                                aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
+                                aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
+                                aws configure set default.region $AWS_REGION
+                                aws sts get-caller-identity --query Account --output text
+                            ''',
+                            returnStdout: true
+                        ).trim()
+                        env.ACCOUNT_ID = accountId
+                        env.ECR_REPO = "${accountId}.dkr.ecr.${AWS_REGION}.amazonaws.com/${IMAGE_NAME}"
+                    }
+                }
             }
         }
 
@@ -25,16 +44,11 @@ pipeline {
 
         stage('Push to AWS ECR') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'aws-ecr-creds', usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY')]) {
-                    sh '''
-                        aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
-                        aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
-                        aws configure set default.region $AWS_REGION
-                        aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REPO
-                        docker tag my-java-app:${BUILD_NUMBER} $ECR_REPO:${BUILD_NUMBER}
-                        docker push $ECR_REPO:${BUILD_NUMBER}
-                    '''
-                }
+                sh '''
+                    aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REPO
+                    docker tag my-java-app:${BUILD_NUMBER} $ECR_REPO:${BUILD_NUMBER}
+                    docker push $ECR_REPO:${BUILD_NUMBER}
+                '''
             }
         }
 
