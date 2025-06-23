@@ -5,6 +5,7 @@ pipeline {
         AWS_REGION = 'us-east-1'
         IMAGE_NAME = 'multi/docker-repo'
         IMAGE_TAG = "${env.BUILD_NUMBER}"
+        WORKSPACE_ROOT = "${env.WORKSPACE}/.."  
     }
 
     stages {
@@ -37,7 +38,8 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 script {
-                    docker.build("my-java-app:${IMAGE_TAG}", "-f app.Dockerfile .")
+                    // build из корня репозитория — используем полный путь
+                    docker.build("my-java-app:${IMAGE_TAG}", "-f ${env.WORKSPACE_ROOT}/app.Dockerfile ${env.WORKSPACE_ROOT}")
                 }
             }
         }
