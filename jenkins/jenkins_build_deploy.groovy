@@ -59,5 +59,23 @@ pipeline {
                 '''
             }
         }
+
+        stage('Deploy with Ansible') {
+            steps {
+                sshagent(['aws_devopscourse_key']) {
+                    withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-terraform-access']]) {
+                        sh '''
+                            export ANSIBLE_HOST_KEY_CHECKING=False
+                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                            export AWS_DEFAULT_REGION=$AWS_REGION
+                            ansible-playbook -i ansible/hosts ansible/deploy.yml -u ubuntu --extra-vars "image_tag=${BUILD_NUMBER} ecr_repo=${ECR_REPO}"
+                        '''
+                    }
+                }
+            }
+        }   
     }
 }
+
+       

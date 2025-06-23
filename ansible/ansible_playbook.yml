@@ -143,6 +143,13 @@
         state: started
         restart_policy: always
 
+    - name: Login to AWS ECR
+      shell: aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin {{ ecr_repo }}
+      environment:
+        AWS_ACCESS_KEY_ID: "{{ lookup('env', 'AWS_ACCESS_KEY_ID') }}"
+        AWS_SECRET_ACCESS_KEY: "{{ lookup('env', 'AWS_SECRET_ACCESS_KEY') }}"
+        AWS_DEFAULT_REGION: "us-east-1"
+
 - name: Install Docker and run Tomcat container
   gather_facts: true
   hosts: tomcat
@@ -194,6 +201,22 @@
         name: git
         state: present
         update_cache: yes
+
+    - name: Install unzip and curl (dependencies for AWS CLI)
+      apt:
+        name:
+          - unzip
+          - curl
+        state: present
+        update_cache: yes
+
+    - name: Install AWS CLI v2
+      shell: |
+        curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "/tmp/awscliv2.zip"
+        unzip -o /tmp/awscliv2.zip -d /tmp
+        /tmp/aws/install
+      args:
+        creates: /usr/local/bin/aws
 
     #- name: Clone GitHub repo with app source
     #  git:
