@@ -64,8 +64,7 @@ pipeline {
             steps {
                 sshagent(['aws_devopscourse_key']) {
                     sh '''
-                        ansible-playbook -i ansible/hosts ansible/deploy.yml ...
-                            --extra-vars "image_tag=${BUILD_NUMBER} ecr_repo=${ECR_REPO}"
+                        ansible-playbook -i ansible/hosts ansible/deploy.yml -u ubuntu --extra-vars "image_tag=${BUILD_NUMBER} ecr_repo=${ECR_REPO}"
                     '''
                 }
             }
