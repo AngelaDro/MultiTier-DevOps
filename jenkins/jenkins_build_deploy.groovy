@@ -16,7 +16,7 @@ pipeline {
 
         stage('Get AWS Account ID') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'aws-ecr-creds', usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-terraform-access']]) {
                     script {
                         def accountId = sh(
                             script: '''
