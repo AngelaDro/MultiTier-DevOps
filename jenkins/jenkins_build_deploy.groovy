@@ -37,9 +37,10 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                script {
-                    // build из корня репозитория — используем полный путь
-                    docker.build("my-java-app:${IMAGE_TAG}", "-f ${env.WORKSPACE_ROOT}/app.Dockerfile ${env.WORKSPACE_ROOT}")
+                dir("${env.WORKSPACE}/..") {  // переходим в корень репозитория
+                    script {
+                        docker.build("my-java-app:${IMAGE_TAG}", "-f app.Dockerfile .")
+                    }
                 }
             }
         }
