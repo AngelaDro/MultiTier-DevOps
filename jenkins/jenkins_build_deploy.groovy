@@ -62,7 +62,7 @@ pipeline {
 
         stage('Deploy with Ansible') {
             steps {
-                sshagent(['jenkins-ssh-key']) {
+                sshagent(['aws_devopscourse_key']) {
                     sh '''
                         ansible-playbook -i inventory.ini ansible/deploy.yml \
                             --extra-vars "image_tag=${BUILD_NUMBER} ecr_repo=${ECR_REPO}"
