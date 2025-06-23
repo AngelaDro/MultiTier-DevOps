@@ -220,7 +220,7 @@
     - name: Run Tomcat container
       community.docker.docker_container:
         name: tomcat
-        image: custom-tomcat
+        image: tomcat:9
         ports:
           - "8080:8080"
         state: started
