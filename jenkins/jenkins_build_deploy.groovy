@@ -5,13 +5,20 @@ pipeline {
         AWS_REGION = 'us-east-1'
         IMAGE_NAME = 'multi/docker-repo'
         IMAGE_TAG = "${env.BUILD_NUMBER}"
-        WORKSPACE_ROOT = "${env.WORKSPACE}/.."  
     }
 
     stages {
         stage('Checkout') {
             steps {
-                git 'https://github.com/AngelaDro/MultiTier-DevOps.git'
+                git branch: 'vpro-file', url: 'https://github.com/AngelaDro/MultiTier-DevOps.git'
+            }
+        }
+
+        stage('Debug Workspace') {
+            steps {
+                sh 'pwd'
+                sh 'ls -la'
+                sh 'ls -la jenkins'
             }
         }
 
@@ -37,10 +44,8 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                dir("${env.WORKSPACE}/..") {  // переходим в корень репозитория
-                    script {
-                        docker.build("my-java-app:${IMAGE_TAG}", "-f app.Dockerfile .")
-                    }
+                script {
+                    docker.build("my-java-app:${IMAGE_TAG}", "-f jenkins/app.Dockerfile .")
                 }
             }
         }
