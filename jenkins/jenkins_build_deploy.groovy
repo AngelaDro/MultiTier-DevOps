@@ -59,16 +59,5 @@ pipeline {
                 '''
             }
         }
-
-        stage('Deploy with Ansible') {
-            steps {
-                sshagent(['ubuntu']) {
-                    sh '''
-                        export ANSIBLE_HOST_KEY_CHECKING=False
-                        ansible-playbook -i ansible/hosts ansible/deploy.yml -u ubuntu --extra-vars "image_tag=${BUILD_NUMBER} ecr_repo=${ECR_REPO}"
-                    '''
-                }
-            }
-        }
     }
 }
