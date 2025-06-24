@@ -2,6 +2,10 @@
 - name: Deploy Java app to Tomcat server
   hosts: tomcat
   become: yes
+  vars:
+    aws_region: "{{ lookup('env', 'AWS_REGION') | default('us-east-1') }}"
+    aws_access_key: "{{ lookup('env', 'AWS_ACCESS_KEY_ID') }}"
+    aws_secret_key: "{{ lookup('env', 'AWS_SECRET_ACCESS_KEY') }}"
 
   tasks:
     - name: Set ECR registry
@@ -9,21 +13,29 @@
         ecr_registry: "{{ ecr_repo.split('/')[0] }}"
 
     - name: Login to AWS ECR
-      shell: |
-        aws ecr get-login-password --region {{ lookup('env', 'AWS_REGION') | default('us-east-1') }} | \
-        docker login --username AWS --password-stdin {{ ecr_registry }}
-      environment:
-        AWS_ACCESS_KEY_ID: "{{ lookup('env', 'AWS_ACCESS_KEY_ID') }}"
-        AWS_SECRET_ACCESS_KEY: "{{ lookup('env', 'AWS_SECRET_ACCESS_KEY') }}"
+      community.docker.docker_login:
+        registry_url: "{{ ecr_registry }}"
+        username: "{{ aws_access_key }}"
+        password: "{{ aws_secret_key }}"
 
-    - name: Pull image
-      shell: docker pull {{ ecr_repo }}:{{ image_tag }}
+    - name: Pull Docker image from AWS ECR
+      community.docker.docker_image:
+        name: "{{ ecr_repo }}"
+        tag: "{{ image_tag }}"
+        source: pull
 
-    - name: Stop old container (if running)
-      shell: docker stop tomcat-app || true
+    - name: Stop and remove old container (if running)
+      community.docker.docker_container:
+        name: tomcat-app
+        state: absent
+        force_kill: true
+        timeout: 10
 
-    - name: Remove old container
-      shell: docker rm tomcat-app || true
-
-    - name: Run new container
-      shell: docker run -d --name tomcat-app -p 8080:8080 {{ ecr_repo }}:{{ image_tag }}
+    - name: Run new Docker container
+      community.docker.docker_container:
+        name: tomcat-app
+        image: "{{ ecr_repo }}:{{ image_tag }}"
+        state: started
+        restart_policy: always
+        published_ports:
+          - "8080:8080"
