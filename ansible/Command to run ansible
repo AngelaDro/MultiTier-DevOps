@@ -1,1 +1,0 @@
-ansible-playbook -i ansible/hosts ansible/deploy.yml -u ubuntu --extra-vars "image_tag=${BUILD_NUMBER} ecr_repo=${ECR_REPO}"
