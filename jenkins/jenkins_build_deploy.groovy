@@ -5,6 +5,13 @@ pipeline {
         IMAGE_NAME = 'multi/docker-repo'
     }
     stages {
+        stage('Debug workspace') {
+            steps {
+                sh 'pwd'
+                sh 'ls -la'
+                sh 'ls -la jenkins || echo "No jenkins directory found"'
+            }
+        }
         stage('Get AWS Account ID') {
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-terraform-access']]) {
@@ -19,7 +26,9 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 script {
-                    docker.build("my-java-app:${env.IMAGE_TAG}", "-f jenkins/app.Dockerfile jenkins/")
+                    // Используем корень репозитория как контекст,
+                    // и указываем путь к Dockerfile внутри jenkins/
+                    docker.build("my-java-app:${env.IMAGE_TAG}", "-f jenkins/app.Dockerfile .")
                 }
             }
         }
