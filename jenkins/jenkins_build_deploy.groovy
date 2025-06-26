@@ -5,6 +5,11 @@ pipeline {
         IMAGE_NAME = 'multi/docker-repo'
     }
     stages {
+        stage('Checkout') {
+            steps {
+                git branch: 'vpro-file', url: 'https://github.com/AngelaDro/MultiTier-DevOps.git'
+            }
+        }
         stage('Debug workspace') {
             steps {
                 sh 'pwd'
@@ -26,8 +31,6 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 script {
-                    // Используем корень репозитория как контекст,
-                    // и указываем путь к Dockerfile внутри jenkins/
                     docker.build("my-java-app:${env.IMAGE_TAG}", "-f jenkins/app.Dockerfile .")
                 }
             }
