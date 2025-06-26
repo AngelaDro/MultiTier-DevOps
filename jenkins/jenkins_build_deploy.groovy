@@ -19,7 +19,7 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 script {
-                    docker.build("my-java-app:${env.IMAGE_TAG}", "-f app.Dockerfile .")
+                    docker.build("my-java-app:${env.IMAGE_TAG}", "-f jenkins/app.Dockerfile .")
                 }
             }
         }
