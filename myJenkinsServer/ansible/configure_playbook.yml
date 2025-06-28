@@ -13,6 +13,7 @@
           - curl
           - python3-pip
           - fontconfig
+          - openjdk-11-jre-headless
         state: present
         update_cache: yes
 
@@ -56,18 +57,16 @@
         dest: /tmp/plugins.txt
         mode: '0644'
 
-    - name: Download jenkins-plugin-cli
+    - name: Download Jenkins Plugin Manager CLI (JAR)
       get_url:
-        url: https://github.com/jenkinsci/plugin-installation-manager-tool/releases/latest/download/jenkins-plugin-cli
-        dest: /usr/local/bin/jenkins-plugin-cli
+        url: https://github.com/jenkinsci/plugin-installation-manager-tool/releases/download/2.13.2/jenkins-plugin-manager-2.13.2.jar
+        dest: /opt/jenkins-plugin-manager.jar
         mode: '0755'
 
-    - name: Install Jenkins plugins using jenkins-plugin-cli
+    - name: Install Jenkins plugins using plugin manager JAR
       shell: |
-        jenkins-plugin-cli \
-          --plugin-file /tmp/plugins.txt \
-          --plugin-dir /var/lib/jenkins/plugins \
-          --war /usr/share/jenkins/jenkins.war
+        java -jar /opt/jenkins-plugin-manager.jar \
+          --plugin-file /tmp/plugins.txt
       environment:
         JENKINS_UC_DOWNLOAD: https://updates.jenkins.io
 
@@ -77,6 +76,21 @@
         recurse: yes
         owner: jenkins
         group: jenkins
+
+    - name: Check if Jenkins plugins directory exists
+      stat:
+        path: /var/lib/jenkins/plugins
+      register: plugins_dir
+
+    - name: List plugins installed
+      command: ls -1 /var/lib/jenkins/plugins
+      register: plugins_list
+      when: plugins_dir.stat.exists
+
+    - name: Show installed plugins list
+      debug:
+        var: plugins_list.stdout_lines
+      when: plugins_dir.stat.exists
 
     - name: Restart Jenkins
       systemd:
