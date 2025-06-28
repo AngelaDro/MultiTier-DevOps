@@ -10,12 +10,6 @@ LICENSE
 .vscode/
 *.iml
 
-# === Build output ===
-target/
-*.war
-*.jar
-*.class
-
 # === Logs and temp ===
 *.log
 *.tmp
@@ -30,12 +24,13 @@ target/
 .env
 .env.*
 
+# === Ansible cache (если не нужно в Docker) ===
+*.retry
+
 # === Terraform and Ansible ===
 .terraform/
 *.tfstate
 *.tfstate.backup
-*.retry
-collections/
 
 # === Jenkins ===
 Jenkinsfile*

@@ -36,6 +36,9 @@
       apt:
         name: "{{ utils_packages + java_packages }}"
         state: present
+    - name: Install python docker module
+      pip:
+        name: docker
 
     # ---------------- Setup AWS CLI ----------------
 
@@ -131,6 +134,18 @@
       args:
         chdir: /opt/jenkins
 
+    - name: Stop existing Jenkins container (if any)
+      docker_container:
+        name: jenkins
+        state: stopped
+      ignore_errors: yes
+
+    - name: Remove existing Jenkins container (if any)
+      docker_container:
+        name: jenkins
+        state: absent
+      ignore_errors: yes
+
     - name: Run Jenkins container with Docker socket
       docker_container:
         name: jenkins
@@ -143,4 +158,3 @@
         volumes:
           - jenkins_home:/var/jenkins_home
           - /var/run/docker.sock:/var/run/docker.sock
-

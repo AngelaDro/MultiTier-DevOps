@@ -14,7 +14,8 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Add jenkins into group docker
-RUN usermod -aG docker jenkins
+RUN groupmod -g 998 docker || groupadd -g 998 docker \
+    && usermod -aG docker jenkins
 
 # Install AWS CLI v2
 RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "/tmp/awscliv2.zip" && \
@@ -23,15 +24,12 @@ RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "/tmp/aws
     rm -rf /tmp/aws /tmp/awscliv2.zip
 
 # Setup Ansible
-RUN pip3 install --break-system-packages ansible
-
-# Create directory for plugins Jenkins
-RUN mkdir -p /usr/share/jenkins/ref/plugins
+RUN pip3 install ansible
 
 # Copy plugins' list 
 COPY plugins.txt /usr/share/jenkins/ref/plugins.txt
 
-# Setup plugins Jenkins
-RUN jenkins-plugin-cli --verbose --plugin-file /usr/share/jenkins/ref/plugins.txt
+# Setup plugins Jenkins (use jenkins-plugin-cli)
+RUN jenkins-plugin-cli --plugin-file /usr/share/jenkins/ref/plugins.txt
 
 USER jenkins

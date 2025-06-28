@@ -29,3 +29,4 @@ matrix-auth
 timestamper
 publish-over-ssh
 maven-plugin
+cloudbees-disk-usage-simple
