@@ -1,0 +1,104 @@
+---
+- name: Install Jenkins on Ubuntu and setup plugins
+  hosts: all
+  become: true
+
+  vars:
+    jenkins_url: http://localhost:8080
+    jenkins_cli_path: /opt/jenkins-cli.jar
+    jenkins_plugins:
+      - git
+      - docker-plugin
+      - ansible
+      - workflow-aggregator
+      - blueocean
+
+  tasks:
+
+    # --- Setup Jenkins and dependences ---
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+
+    - name: Install dependencies
+      apt:
+        name:
+          - fontconfig
+          - openjdk-21-jre
+          - apt-transport-https
+          - wget
+          - curl
+          - gnupg
+          - software-properties-common
+          - git
+          - xmlstarlet
+        state: present
+
+    - name: Add Jenkins GPG key
+      get_url:
+        url: https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
+        dest: /usr/share/keyrings/jenkins-keyring.asc
+        mode: '0644'
+
+    - name: Add Jenkins APT repository
+      apt_repository:
+        repo: "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/"
+        filename: jenkins
+        state: present
+
+    - name: Install Jenkins
+      apt:
+        name: jenkins
+        state: present
+
+    - name: Enable and start Jenkins
+      systemd:
+        name: jenkins
+        enabled: yes
+        state: started
+
+    # --- Waiting starting Jenkins ---
+    - name: Wait for Jenkins to be ready
+      uri:
+        url: "{{ jenkins_url }}/login"
+        status_code: 200
+        validate_certs: no
+        timeout: 30
+      register: result
+      retries: 15
+      delay: 10
+      until: result.status == 200
+
+    # --- Get initialAdminPassword ---
+    - name: Get initial Jenkins admin password
+      slurp:
+        src: /var/lib/jenkins/secrets/initialAdminPassword
+      register: jenkins_admin_raw
+
+    - name: Set Jenkins admin password fact
+      set_fact:
+        jenkins_admin_password: "{{ jenkins_admin_raw.content | b64decode }}"
+
+    # --- Install Jenkins CLI ---
+    - name: Download Jenkins CLI
+      get_url:
+        url: "{{ jenkins_url }}/jnlpJars/jenkins-cli.jar"
+        dest: "{{ jenkins_cli_path }}"
+        mode: '0755'
+
+    # --- Install plugins ---
+    - name: Install Jenkins plugins via CLI
+      shell: >
+        java -jar {{ jenkins_cli_path }} -s {{ jenkins_url }}
+        -auth admin:{{ jenkins_admin_password }}
+        install-plugin {{ item }} -deploy
+      with_items: "{{ jenkins_plugins }}"
+      register: plugin_install_result
+      changed_when: "'already' not in plugin_install_result.stdout"
+
+    # --- Restart Jenkins ---
+    - name: Restart Jenkins via CLI
+      shell: >
+        java -jar {{ jenkins_cli_path }} -s {{ jenkins_url }}
+        -auth admin:{{ jenkins_admin_password }}
+        safe-restart

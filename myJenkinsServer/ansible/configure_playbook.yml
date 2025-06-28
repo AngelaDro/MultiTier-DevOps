@@ -1,0 +1,84 @@
+---
+- name: Configure Jenkins as per Dockerfile setup
+  hosts: all
+  become: true
+
+  tasks:
+
+    - name: Install dependencies
+      apt:
+        name:
+          - docker.io
+          - unzip
+          - curl
+          - python3-pip
+          - fontconfig
+        state: present
+        update_cache: yes
+
+    - name: Add Jenkins user to docker group
+      user:
+        name: jenkins
+        groups: docker
+        append: yes
+
+    - name: Download AWS CLI v2
+      get_url:
+        url: "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip"
+        dest: "/tmp/awscliv2.zip"
+
+    - name: Unzip AWS CLI installer
+      unarchive:
+        src: "/tmp/awscliv2.zip"
+        dest: "/tmp"
+        remote_src: yes
+
+    - name: Install AWS CLI v2
+      shell: "/tmp/aws/install"
+      args:
+        creates: /usr/local/bin/aws
+
+    - name: Remove AWS CLI temp files
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "/tmp/aws"
+        - "/tmp/awscliv2.zip"
+
+    - name: Install Ansible via pip
+      pip:
+        name: ansible
+
+    - name: Copy plugins.txt to Jenkins server
+      copy:
+        src: plugins.txt
+        dest: /tmp/plugins.txt
+        mode: '0644'
+
+    - name: Download jenkins-plugin-cli
+      get_url:
+        url: https://github.com/jenkinsci/plugin-installation-manager-tool/releases/latest/download/jenkins-plugin-cli
+        dest: /usr/local/bin/jenkins-plugin-cli
+        mode: '0755'
+
+    - name: Install Jenkins plugins using jenkins-plugin-cli
+      shell: |
+        jenkins-plugin-cli \
+          --plugin-file /tmp/plugins.txt \
+          --plugin-dir /var/lib/jenkins/plugins \
+          --war /usr/share/jenkins/jenkins.war
+      environment:
+        JENKINS_UC_DOWNLOAD: https://updates.jenkins.io
+
+    - name: Set correct permissions for plugins
+      file:
+        path: /var/lib/jenkins/plugins
+        recurse: yes
+        owner: jenkins
+        group: jenkins
+
+    - name: Restart Jenkins
+      systemd:
+        name: jenkins
+        state: restarted
