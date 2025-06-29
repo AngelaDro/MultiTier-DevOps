@@ -7,12 +7,6 @@ Thumbs.db
 *.iml
 out/
 
-# === Maven / Java build ===
-target/
-*.war
-*.jar
-*.class
-
 # === Files and keys that should stay out of the repository ===
 erlang_solutions.asc
 collections/
@@ -38,12 +32,6 @@ Thumbs.db
 *.bak
 *.retry
 *.facts
-
-# === Java & Maven ===
-target/
-*.war
-*.jar
-*.class
 
 # === Docker ===
 *.tar
@@ -90,3 +78,10 @@ __pycache__/
 .vagrant/
 vagrant/**/provisioning_output.log
 vagrant/**/output.txt
+
+# === Java ===
+*.class
+*.jar
+*.war
+*.ear
+/target/
