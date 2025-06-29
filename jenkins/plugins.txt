@@ -9,6 +9,11 @@ aws-credentials
 pipeline-aws
 locale
 dark-theme
+ansible
+git
+terraform
+aws-credentials
+locale
 pipeline-stage-view
 docker-plugin
 credentials-binding
