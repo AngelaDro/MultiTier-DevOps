@@ -4,8 +4,8 @@
   become: yes
   vars:
     aws_region: "{{ lookup('env', 'AWS_REGION') | default('us-east-1') }}"
-    aws_access_key: "{{ lookup('env', 'AWS_ACCESS_KEY_ID') }}"
-    aws_secret_key: "{{ lookup('env', 'AWS_SECRET_ACCESS_KEY') }}"
+    aws_access_key_id: "{{ lookup('env', 'AWS_ACCESS_KEY_ID') }}"
+    aws_secret_access_key: "{{ lookup('env', 'AWS_SECRET_ACCESS_KEY') }}"
 
   tasks:
     - name: Set ECR registry
@@ -13,10 +13,13 @@
         ecr_registry: "{{ ecr_repo.split('/')[0] }}"
 
     - name: Login to AWS ECR
-      community.docker.docker_login:
-        registry_url: "{{ ecr_registry }}"
-        username: "{{ aws_access_key }}"
-        password: "{{ aws_secret_key }}"
+      shell: |
+        aws ecr get-login-password --region {{ aws_region }} | docker login --username AWS --password-stdin {{ ecr_registry }}
+      environment:
+        AWS_ACCESS_KEY_ID: "{{ aws_access_key_id }}"
+        AWS_SECRET_ACCESS_KEY: "{{ aws_secret_access_key }}"
+        AWS_DEFAULT_REGION: "{{ aws_region }}"
+      no_log: true
 
     - name: Pull Docker image from AWS ECR
       community.docker.docker_image:
