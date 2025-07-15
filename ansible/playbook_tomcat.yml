@@ -91,32 +91,4 @@
         rm /tmp/ROOT.tar.gz
         "
 
-    - name: Restart Tomcat container
-      command: docker restart "{{ container_name }}"
-
-    - name: Deploy nginx config proxying to Tomcat
-      template:
-        src: nginx-tomcat.conf.j2
-        dest: /etc/nginx/sites-available/default
-        owner: root
-        group: root
-        mode: '0644'
-      notify: Restart nginx
-
-    - name: Ensure nginx is installed
-      apt:
-        name: nginx
-        state: present
-        update_cache: yes
-
-    - name: Ensure nginx service is running
-      service:
-        name: nginx
-        state: started
-        enabled: yes
-
-  handlers:
-    - name: Restart nginx
-      service:
-        name: nginx
-        state: restarted
+   

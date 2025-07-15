@@ -1,0 +1,14 @@
+[mysql]
+44.220.161.146 ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/DevopsCourseKeys.pem
+
+[memcached]
+54.242.53.193 ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/DevopsCourseKeys.pem
+
+[rabbitmq]
+34.201.93.39 ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/DevopsCourseKeys.pem
+
+[tomcat]
+107.21.166.120 ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/DevopsCourseKeys.pem
+
+[nginx]
+54.89.172.69 ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/DevopsCourseKeys.pem
