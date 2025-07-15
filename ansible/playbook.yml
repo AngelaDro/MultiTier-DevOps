@@ -1,0 +1,122 @@
+---
+- name: Deploy Tomcat ROOT page and install Docker on remote host
+  hosts: tomcat
+  become: true
+  vars:
+    tomcat_tarball_url: https://archive.apache.org/dist/tomcat/tomcat-9/v9.0.0.M26/bin/apache-tomcat-9.0.0.M26.tar.gz
+    tomcat_tarball_path: /tmp/apache-tomcat-9.0.0.M26.tar.gz
+    root_dir: /tmp/ROOT
+    root_archive: /tmp/ROOT.tar.gz
+    container_name: tomcat
+
+  tasks:
+    - name: Remove conflicting containerd and containerd.io packages if installed
+      apt:
+        name:
+          - containerd
+          - containerd.io
+        state: absent
+      ignore_errors: yes
+
+    - name: Install prerequisites for Docker repository
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - software-properties-common
+        state: present
+        update_cache: yes
+
+    - name: Add Docker official GPG key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: Add Docker stable repository
+      apt_repository:
+        repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu focal stable
+        state: present
+        filename: docker
+
+    - name: Update apt cache after adding Docker repo
+      apt:
+        update_cache: yes
+
+    - name: Install Docker CE
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+        state: present
+
+    - name: Ensure Docker service is running
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Download Tomcat archive
+      get_url:
+        url: "{{ tomcat_tarball_url }}"
+        dest: "{{ tomcat_tarball_path }}"
+        mode: '0644'
+
+    - name: Extract Tomcat archive
+      unarchive:
+        src: "{{ tomcat_tarball_path }}"
+        dest: /tmp
+        remote_src: yes
+
+    - name: Copy ROOT directory from extracted Tomcat
+      command: cp -r /tmp/apache-tomcat-9.0.0.M26/webapps/ROOT /tmp/ROOT
+      args:
+        creates: "{{ root_dir }}"
+
+    - name: Create tar.gz of ROOT directory
+      command: tar -czf "{{ root_archive }}" -C /tmp ROOT
+      args:
+        creates: "{{ root_archive }}"
+
+    - name: Copy ROOT.tar.gz into Docker container
+      command: docker cp "{{ root_archive }}" "{{ container_name }}:/tmp/ROOT.tar.gz"
+
+    - name: Replace ROOT in Tomcat container
+      command: >
+        docker exec {{ container_name }} bash -c "
+        cd /usr/local/tomcat/webapps &&
+        rm -rf ROOT &&
+        tar -xzf /tmp/ROOT.tar.gz &&
+        rm /tmp/ROOT.tar.gz
+        "
+
+    - name: Restart Tomcat container
+      command: docker restart "{{ container_name }}"
+
+    - name: Deploy nginx config proxying to Tomcat
+      template:
+        src: nginx-tomcat.conf.j2
+        dest: /etc/nginx/sites-available/default
+        owner: root
+        group: root
+        mode: '0644'
+      notify: Restart nginx
+
+    - name: Ensure nginx is installed
+      apt:
+        name: nginx
+        state: present
+        update_cache: yes
+
+    - name: Ensure nginx service is running
+      service:
+        name: nginx
+        state: started
+        enabled: yes
+
+  handlers:
+    - name: Restart nginx
+      service:
+        name: nginx
+        state: restarted
