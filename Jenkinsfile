@@ -11,6 +11,13 @@ pipeline {
             }
         }
         
+        stage('Unit tests') {
+            steps {
+                // Runs the Maven tests in a throw-away container (no Maven needed on the agent)
+                sh 'docker run --rm -v "$WORKSPACE":/app -w /app maven:3-eclipse-temurin-17 mvn -B -q test'
+            }
+        }
+
         stage('Get AWS Account ID') {
             steps {
                 withCredentials([[

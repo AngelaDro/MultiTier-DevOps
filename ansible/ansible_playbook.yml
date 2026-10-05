@@ -2,11 +2,14 @@
   gather_facts: true
   hosts: mysql
   become: true
+  vars_files:
+    - vars/secrets.yml
   vars:
     ansible_python_interpreter: /usr/bin/python3.10
     db_name: multidb
     db_user: multi
-    db_password: multidev
+    # Secret: defined in ansible/vars/secrets.yml (encrypted with ansible-vault)
+    db_password: "{{ vault_db_password }}"
     mysql_root_password: ''
     bind_address: "0.0.0.0"
   tasks:
@@ -233,19 +236,6 @@
     #      path: "/home/ubuntu/MultiTier-DevOps"
     #      dockerfile: "app.Dockerfile"
 
-- name: Run Tomcat container
-  hosts: tomcat
-  become: true
-  tasks:
-    - name: Run Tomcat container
-      community.docker.docker_container:
-        name: tomcat
-        image: tomcat:9
-        ports:
-          - "8080:8080"
-        state: started
-        restart_policy: always
-
 - name: Configure Nginx server
   gather_facts: true
   hosts: nginx
@@ -270,7 +260,7 @@
     - name: Configure Nginx to proxy to Tomcat
       template:
         src: templates/nginx-tomcat.conf.j2
-        dest: /etc/nginx/sites-available/tomcat
+        dest: /etc/nginx/sites-available/default
         mode: '0644'
       notify: Restart Nginx
 

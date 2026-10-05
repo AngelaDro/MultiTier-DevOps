@@ -20,6 +20,9 @@ terraform {
     bucket = "terraform-state-angela"
     key    = "multitier/tf-test-state.tfstate"
     region = "us-east-1"
+    encrypt = true
+    # State locking: create a DynamoDB table (hash key "LockID") and uncomment:
+    # dynamodb_table = "terraform-state-lock"
   }
 }
 
@@ -27,18 +30,9 @@ provider "aws" {
   region = "us-east-1"
 }
 
-variable "key_name" {
-  type    = string
-  default = "DevopsCourseKeys"
-}
-
-variable "ami_id" {
-  type    = string
-  default = "ami-0f9de6e2d2f067fca"
-}
 
 data "aws_vpc" "selected" {
-  id = "vpc-059adf4532fbff600"
+  id = var.vpc_id
 }
 
 data "aws_subnets" "selected" {
@@ -48,20 +42,15 @@ data "aws_subnets" "selected" {
   }
 }
 
-resource "aws_security_group" "main_sg" {
-  name        = "main-service-sg"
-  description = "Allow all necessary ports"
+# --- Security groups -------------------------------------------------------
+# ALB: the only component that is open to the whole internet (HTTP/HTTPS).
+resource "aws_security_group" "alb_sg" {
+  name        = "alb-sg"
+  description = "Public entry point: HTTP/HTTPS"
+  vpc_id      = data.aws_vpc.selected.id
 
   ingress {
-    description = "Allow SSH"
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    description = "Allow HTTP"
+    description = "HTTP (redirected to HTTPS)"
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
@@ -69,49 +58,74 @@ resource "aws_security_group" "main_sg" {
   }
 
   ingress {
-    description = "Allow HTTPS"
+    description = "HTTPS"
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  ingress {
-    description = "Allow RabbitMQ"
-    from_port   = 5672
-    to_port     = 5672
-    protocol    = "tcp"
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+# Application servers: SSH and the RabbitMQ web UI only from my own IP,
+# backend ports only between the servers themselves, Tomcat only via ALB.
+resource "aws_security_group" "main_sg" {
+  name        = "main-service-sg"
+  description = "Application servers"
+  vpc_id      = data.aws_vpc.selected.id
+
+  ingress {
+    description = "SSH from admin IP only"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = [var.admin_cidr]
   }
 
   ingress {
-    description = "RabbitMQ Web UI"
+    description = "RabbitMQ web UI from admin IP only"
     from_port   = 15672
     to_port     = 15672
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = [var.admin_cidr]
   }
 
   ingress {
-    description = "Allow Memcached"
-    from_port   = 11211
-    to_port     = 11211
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    description     = "Tomcat from the load balancer"
+    from_port       = 8080
+    to_port         = 8080
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb_sg.id]
   }
 
-  ingress {
-    description = "Allow MySQL"
-    from_port   = 3306
-    to_port     = 3306
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+  # Servers talk to each other over PRIVATE IPs (see output private_ips).
+  dynamic "ingress" {
+    for_each = {
+      "Tomcat (from Nginx)" = 8080
+      "MySQL"               = 3306
+      "Memcached"           = 11211
+      "RabbitMQ"            = 5672
+    }
+    content {
+      description = "${ingress.key} between servers"
+      from_port   = ingress.value
+      to_port     = ingress.value
+      protocol    = "tcp"
+      self        = true
+    }
   }
 
+  # Optional: Nginx reverse proxy reachable directly on port 80.
   ingress {
-    description = "Allow Tomcat"
-    from_port   = 8080
-    to_port     = 8080
+    description = "HTTP to Nginx"
+    from_port   = 80
+    to_port     = 80
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
@@ -213,7 +227,7 @@ resource "aws_lb" "app_lb" {
   name               = "app-lb"
   internal           = false
   load_balancer_type = "application"
-  security_groups    = [aws_security_group.main_sg.id]
+  security_groups    = [aws_security_group.alb_sg.id]
   subnets            = data.aws_subnets.selected.ids
   enable_deletion_protection = false
 }
@@ -244,8 +258,8 @@ resource "aws_lb_listener" "https" {
   load_balancer_arn = aws_lb.app_lb.arn
   port              = 443
   protocol          = "HTTPS"
-  ssl_policy        = "ELBSecurityPolicy-2016-08"
-  certificate_arn   = "arn:aws:acm:us-east-1:931130763859:certificate/1b8e66ca-2919-4b0f-b59a-b9fdc7e9919c"
+  ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
+  certificate_arn   = var.certificate_arn
 
   default_action {
     type             = "forward"
@@ -298,4 +312,19 @@ output "server_public_ips" {
     tomcat    = aws_instance.tomcat.public_ip
     nginx     = aws_instance.nginx.public_ip
   }
+}
+
+output "private_ips" {
+  description = "Private IPs - use these in the application config so SG rules apply"
+  value = {
+    mysql     = aws_instance.mysql.private_ip
+    memcached = aws_instance.memcached.private_ip
+    rabbitmq  = aws_instance.rabbitmq.private_ip
+    tomcat    = aws_instance.tomcat.private_ip
+    nginx     = aws_instance.nginx.private_ip
+  }
+}
+
+output "alb_dns_name" {
+  value = aws_lb.app_lb.dns_name
 }

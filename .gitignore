@@ -39,8 +39,6 @@ docker-compose.override.yml
 .docker/
 
 # === Jenkins ===
-Jenkinsfile*
-*.jenkinsfile
 jenkins_output.log
 
 # === Terraform ===
@@ -49,6 +47,7 @@ jenkins_output.log
 *.tfstate.backup
 crash.log
 terraform.tfvars
+!terraform.tfvars.example
 *.auto.tfvars
 terraform_output.json
 
@@ -58,7 +57,9 @@ terraform_output.json
 collections/
 inventory.yaml
 *.vault
-*.cfg
+.vault_pass
+ansible/hosts
+ansible/vars/secrets.yml
 
 # === AWS / sensitive keys ===
 *.pem
