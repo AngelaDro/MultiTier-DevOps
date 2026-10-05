@@ -1,0 +1,36 @@
+# === General ===
+.git
+.gitignore
+*.md
+README*
+LICENSE
+
+# === IDEs and editors ===
+.idea/
+.vscode/
+*.iml
+
+# === Logs and temp ===
+*.log
+*.tmp
+*.bak
+*.swp
+
+# === Secrets and keys ===
+*.pem
+*.key
+*.crt
+*.pub
+.env
+.env.*
+
+# === Ansible cache (если не нужно в Docker) ===
+*.retry
+
+# === Terraform and Ansible ===
+.terraform/
+*.tfstate
+*.tfstate.backup
+
+# === Jenkins ===
+Jenkinsfile*

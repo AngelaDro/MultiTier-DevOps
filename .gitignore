@@ -1,0 +1,88 @@
+# === Common system files ===
+.DS_Store
+Thumbs.db
+
+# === IntelliJ IDEA / JetBrains IDEs ===
+.idea/
+*.iml
+out/
+
+# === Files and keys that should stay out of the repository ===
+erlang_solutions.asc
+collections/
+*.pem
+*.key
+*.crt
+*.pub
+
+# === Common system files ===
+.DS_Store
+Thumbs.db
+
+# === IDEs and editors ===
+.idea/
+*.iml
+*.vscode/
+*.swp
+
+# === Logs and temporary files ===
+*.log
+*.lock
+*.tmp
+*.bak
+*.retry
+*.facts
+
+# === Docker ===
+*.tar
+docker-compose.override.yml
+.docker/
+
+# === Jenkins ===
+jenkins_output.log
+
+# === Terraform ===
+.terraform/
+*.tfstate
+*.tfstate.backup
+crash.log
+terraform.tfvars
+!terraform.tfvars.example
+*.auto.tfvars
+terraform_output.json
+
+# === Ansible ===
+*.retry
+*.facts
+collections/
+inventory.yaml
+*.vault
+.vault_pass
+ansible/hosts
+ansible/vars/secrets.yml
+
+# === AWS / sensitive keys ===
+*.pem
+*.key
+*.crt
+*.pub
+aws-credentials.json
+.env
+.env.*
+
+# === Python (if accidentally used) ===
+__pycache__/
+*.pyc
+
+# === Vagrant ===
+*.box
+.vagrant/
+vagrant/**/provisioning_output.log
+vagrant/**/output.txt
+
+# === Java ===
+*.class
+*.jar
+*.war
+*.ear
+/target/

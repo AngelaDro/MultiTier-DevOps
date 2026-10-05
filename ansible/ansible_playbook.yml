@@ -1,0 +1,271 @@
+- name: Configure MySQL server
+  gather_facts: true
+  hosts: mysql
+  become: true
+  vars_files:
+    - vars/secrets.yml
+  vars:
+    ansible_python_interpreter: /usr/bin/python3.10
+    db_name: multidb
+    db_user: multi
+    # Secret: defined in ansible/vars/secrets.yml (encrypted with ansible-vault)
+    db_password: "{{ vault_db_password }}"
+    mysql_root_password: ''
+    bind_address: "0.0.0.0"
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+
+    - name: Install MySQL server
+      apt:
+        name: mysql-server
+        state: present
+
+    - name: Ensure MySQL service is running
+      service:
+        name: mysql
+        state: started
+        enabled: yes
+
+    - name: Install Python MySQL client
+      apt:
+        name: python3-mysqldb
+        state: present
+
+    - name: Allow remote connections to MySQL
+      lineinfile:
+        path: /etc/mysql/mysql.conf.d/mysqld.cnf
+        regexp: '^bind-address'
+        line: "bind-address = {{ bind_address }}"
+        backup: yes
+      notify: Restart MySQL
+
+    - name: Create database
+      community.mysql.mysql_db:
+        name: "{{ db_name }}"
+        state: present
+        login_user: root
+        login_password: "{{ mysql_root_password }}"
+
+    - name: Create user with remote access
+      community.mysql.mysql_user:
+        name: "{{ db_user }}"
+        password: "{{ db_password }}"
+        priv: "{{ db_name }}.*:ALL"
+        host: "%"
+        state: present
+        login_user: root
+        login_password: "{{ mysql_root_password }}"
+
+  handlers:
+    - name: Restart MySQL
+      service:
+        name: mysql
+        state: restarted
+
+- name: Configure Memcached server
+  gather_facts: true
+  hosts: memcached
+  become: true
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install Memcached
+      apt:
+        name: memcached
+        state: present
+
+    - name: Ensure Memcached service is running
+      service:
+        name: memcached
+        state: started
+        enabled: true
+
+- name: Install Docker and run RabbitMQ container
+  gather_facts: true
+  hosts: rabbitmq
+  become: true
+  tasks:
+    - name: Install required packages
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - software-properties-common
+          - gnupg
+        state: present
+        update_cache: yes
+      when: ansible_os_family == "Debian"
+
+    - name: Add Docker GPG key
+      shell: curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+      args:
+        creates: /usr/share/keyrings/docker-archive-keyring.gpg
+      when: ansible_os_family == "Debian"
+
+    - name: Add Docker repository
+      apt_repository:
+        repo: "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Update apt cache after adding Docker repo
+      apt:
+        update_cache: yes
+      when: ansible_os_family == "Debian"
+
+    - name: Install Docker CE
+      apt:
+        name: docker-ce
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Ensure Docker service is running
+      service:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Pull RabbitMQ image
+      community.docker.docker_image:
+        name: rabbitmq:3-management
+        source: pull
+
+    - name: Run RabbitMQ container
+      community.docker.docker_container:
+        name: rabbitmq
+        image: rabbitmq:3-management
+        ports:
+          - "5672:5672"
+          - "15672:15672"
+        state: started
+        restart_policy: always
+
+- name: Install Docker and run Tomcat container
+  gather_facts: true
+  hosts: tomcat
+  become: true
+  tasks:
+    - name: Install required packages
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - software-properties-common
+          - gnupg
+        state: present
+        update_cache: yes
+      when: ansible_os_family == "Debian"
+
+    - name: Add Docker GPG key
+      shell: curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+      args:
+        creates: /usr/share/keyrings/docker-archive-keyring.gpg
+      when: ansible_os_family == "Debian"
+
+    - name: Add Docker repository
+      apt_repository:
+        repo: "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Update apt cache after adding Docker repo
+      apt:
+        update_cache: yes
+      when: ansible_os_family == "Debian"
+
+    - name: Install Docker CE
+      apt:
+        name: docker-ce
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Ensure Docker is running
+      service:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Install git on remote host
+      apt:
+        name: git
+        state: present
+        update_cache: yes
+
+    - name: Install unzip and curl (dependencies for AWS CLI)
+      apt:
+        name:
+          - unzip
+          - curl
+        state: present
+        update_cache: yes
+
+    - name: Install AWS CLI v2
+      shell: |
+        curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "/tmp/awscliv2.zip"
+        unzip -o /tmp/awscliv2.zip -d /tmp
+        /tmp/aws/install
+      args:
+        creates: /usr/local/bin/aws
+
+    #- name: Clone GitHub repo with app source
+    #  git:
+    #    repo: https://github.com/AngelaDro/MultiTier-DevOps.git
+    #    dest: /home/{{ ansible_user }}/MultiTier-DevOps
+    #    version: vpro-file
+    #    force: yes
+
+    #- name: Fix ownership of the project directory
+    #  file:
+    #    path: "/home/{{ ansible_user }}/MultiTier-DevOps"
+    #    owner: "{{ ansible_user }}"
+    #    group: "{{ ansible_user }}"
+    #    recurse: yes
+
+    #- name: Build Tomcat app Docker image
+    #  community.docker.docker_image:
+    #    name: custom-tomcat
+    #    source: build
+    #    build:
+    #      path: "/home/ubuntu/MultiTier-DevOps"
+    #      dockerfile: "app.Dockerfile"
+
+- name: Configure Nginx server
+  gather_facts: true
+  hosts: nginx
+  become: true
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install Nginx
+      apt:
+        name: nginx
+        state: present
+
+    - name: Ensure Nginx service is running
+      service:
+        name: nginx
+        state: started
+        enabled: true
+
+    - name: Configure Nginx to proxy to Tomcat
+      template:
+        src: templates/nginx-tomcat.conf.j2
+        dest: /etc/nginx/sites-available/default
+        mode: '0644'
+      notify: Restart Nginx
+
+  handlers:
+    - name: Restart Nginx
+      service:
+        name: nginx
+        state: restarted

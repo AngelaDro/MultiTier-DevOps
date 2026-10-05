@@ -1,121 +1,114 @@
 pipeline {
-    
-	agent any
-/*	
-	tools {
-        maven "maven3"
-    }
-*/	
+    agent any
     environment {
-        NEXUS_VERSION = "nexus3"
-        NEXUS_PROTOCOL = "http"
-        NEXUS_URL = "172.31.40.209:8081"
-        NEXUS_REPOSITORY = "vprofile-release"
-	NEXUS_REPO_ID    = "vprofile-release"
-        NEXUS_CREDENTIAL_ID = "nexuslogin"
-        ARTVERSION = "${env.BUILD_ID}"
+        AWS_REGION = 'us-east-1'
+        IMAGE_NAME = 'multi/docker-repo'
     }
-	
-    stages{
+    stages {
+        stage('Checkout') {
+            steps {
+                git branch: 'vpro-file', url: 'https://github.com/AngelaDro/MultiTier-DevOps.git'
+            }
+        }
         
-        stage('BUILD'){
+        stage('Unit tests') {
             steps {
-                sh 'mvn clean install -DskipTests'
-            }
-            post {
-                success {
-                    echo 'Now Archiving...'
-                    archiveArtifacts artifacts: '**/target/*.war'
-                }
+                // Runs the Maven tests in a throw-away container (no Maven needed on the agent)
+                sh 'docker run --rm -v "$WORKSPACE":/app -w /app maven:3-eclipse-temurin-17 mvn -B -q test'
             }
         }
 
-	stage('UNIT TEST'){
+        stage('Get AWS Account ID') {
             steps {
-                sh 'mvn test'
-            }
-        }
-
-	stage('INTEGRATION TEST'){
-            steps {
-                sh 'mvn verify -DskipUnitTests'
-            }
-        }
-		
-        stage ('CODE ANALYSIS WITH CHECKSTYLE'){
-            steps {
-                sh 'mvn checkstyle:checkstyle'
-            }
-            post {
-                success {
-                    echo 'Generated Analysis Result'
-                }
-            }
-        }
-
-        stage('CODE ANALYSIS with SONARQUBE') {
-          
-		  environment {
-             scannerHome = tool 'sonarscanner4'
-          }
-
-          steps {
-            withSonarQubeEnv('sonar-pro') {
-               sh '''${scannerHome}/bin/sonar-scanner -Dsonar.projectKey=vprofile \
-                   -Dsonar.projectName=vprofile-repo \
-                   -Dsonar.projectVersion=1.0 \
-                   -Dsonar.sources=src/ \
-                   -Dsonar.java.binaries=target/test-classes/com/visualpathit/account/controllerTest/ \
-                   -Dsonar.junit.reportsPath=target/surefire-reports/ \
-                   -Dsonar.jacoco.reportsPath=target/jacoco.exec \
-                   -Dsonar.java.checkstyle.reportPaths=target/checkstyle-result.xml'''
-            }
-
-            timeout(time: 10, unit: 'MINUTES') {
-               waitForQualityGate abortPipeline: true
-            }
-          }
-        }
-
-        stage("Publish to Nexus Repository Manager") {
-            steps {
-                script {
-                    pom = readMavenPom file: "pom.xml";
-                    filesByGlob = findFiles(glob: "target/*.${pom.packaging}");
-                    echo "${filesByGlob[0].name} ${filesByGlob[0].path} ${filesByGlob[0].directory} ${filesByGlob[0].length} ${filesByGlob[0].lastModified}"
-                    artifactPath = filesByGlob[0].path;
-                    artifactExists = fileExists artifactPath;
-                    if(artifactExists) {
-                        echo "*** File: ${artifactPath}, group: ${pom.groupId}, packaging: ${pom.packaging}, version ${pom.version} ARTVERSION";
-                        nexusArtifactUploader(
-                            nexusVersion: NEXUS_VERSION,
-                            protocol: NEXUS_PROTOCOL,
-                            nexusUrl: NEXUS_URL,
-                            groupId: pom.groupId,
-                            version: ARTVERSION,
-                            repository: NEXUS_REPOSITORY,
-                            credentialsId: NEXUS_CREDENTIAL_ID,
-                            artifacts: [
-                                [artifactId: pom.artifactId,
-                                classifier: '',
-                                file: artifactPath,
-                                type: pom.packaging],
-                                [artifactId: pom.artifactId,
-                                classifier: '',
-                                file: "pom.xml",
-                                type: "pom"]
-                            ]
-                        );
-                    } 
-		    else {
-                        error "*** File: ${artifactPath}, could not be found";
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding', 
+                    credentialsId: 'aws-terraform-access',
+                    accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+                    secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+                ]]) {
+                    script {
+                        env.ACCOUNT_ID = sh(script: 'aws sts get-caller-identity --query Account --output text', returnStdout: true).trim()
+                        env.ECR_REPO = "${env.ACCOUNT_ID}.dkr.ecr.${env.AWS_REGION}.amazonaws.com/${env.IMAGE_NAME}"
+                        env.IMAGE_TAG = env.BUILD_NUMBER
                     }
                 }
             }
         }
+        
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    docker.build("my-java-app:${env.IMAGE_TAG}", "-f jenkins/app.Dockerfile .")
+                }
+            }
+        }
+        
+        stage('Push to AWS ECR') {
+            steps {
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding', 
+                    credentialsId: 'aws-terraform-access',
+                    accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+                    secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+                ]]) {
+                    script {
+                        sh """
+                            aws ecr get-login-password --region ${env.AWS_REGION} | docker login --username AWS --password-stdin ${env.ECR_REPO}
+                            docker tag my-java-app:${env.IMAGE_TAG} ${env.ECR_REPO}:${env.IMAGE_TAG}
+                            docker push ${env.ECR_REPO}:${env.IMAGE_TAG}
+                        """
+                    }
+                }
+            }
+        }
+        
+        stage('Update Ansible Hosts') {
+            steps {
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding', 
+                    credentialsId: 'aws-terraform-access',
+                    accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+                    secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+                ]]) {
+                    script {
+                        def tomcat_ip = sh(
+                            script: '''
+                                aws ec2 describe-instances \
+                                    --filters "Name=tag:Name,Values=tomcat" "Name=instance-state-name,Values=running" \
+                                    --query "Reservations[*].Instances[*].PublicIpAddress" \
+                                    --output text
+                            ''',
+                            returnStdout: true
+                        ).trim()
 
+                        echo "Tomcat IP: ${tomcat_ip}"
 
+                        writeFile file: 'ansible/hosts', text: """
+[tomcat]
+${tomcat_ip} ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/DevopsCourseKeys.pem
+"""
+                    }
+                }
+            }
+        }
+        
+        stage('Deploy with Ansible') {
+            steps {
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding', 
+                    credentialsId: 'aws-terraform-access',
+                    accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+                    secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+                ]]) {
+                    sshagent(['aws_devopscourse_key']) {
+                        sh """
+                            ansible-playbook -i ansible/hosts ansible/deploy.yml -u ubuntu \
+                            --extra-vars "image_tag=${env.IMAGE_TAG} ecr_repo=${env.ECR_REPO}" \
+                            --ssh-extra-args='-o StrictHostKeyChecking=no'
+                        """
+                    }
+                }
+            }
+        }
     }
-
-
 }
